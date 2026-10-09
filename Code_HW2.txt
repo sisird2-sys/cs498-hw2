@@ -1,0 +1,15 @@
+Server (server/index.js)
+This repo has the server code, the deployment scripts, and two client scripts for Part IV. The server is in server/index.js. It is an Express app that listens on port 8080 and has four endpoints. These are /greeting, /register, /list and /clear. It uses the @google-cloud/datastore library to talk to Firestore in Datastore mode. Each user is saved as kind User with the username as the key. I also save a createdAt timestamp. The same code runs on both VMs. Both VMs point at the same default Firestore database, so no replication code is needed.
+
+The deployment is done with two scripts instead of clicking through the console. setup.sh turns on the APIs and creates the Firestore database in us-central1. It also makes a firewall rule that opens TCP port 8080 for any VM with the tag http-8080. Then it creates two e2-micro Ubuntu 22.04 VMs. One is in us-central1 and the other is in europe-west1. Each one gets the tag, a static IP and full Cloud API access. The server files are passed to the VMs as instance metadata. vm-startup.sh runs when a VM boots. It installs Node 22, pulls the server files, and runs npm install. It then starts the server as a systemd service so it comes back after a reboot.
+
+The server follows the sample code with one small change. /clear deletes the keys in groups of 500. This is because Datastore only allows 500 deletes per call.
+
+The latency script is in client/latency.js. It runs in Google Cloud Shell and not on the VMs. It reads the two IPs from IPs.txt. The first IP is us-central1 and the second is europe-west1. For each VM it sends 10 POST requests to /register with a new username each time. Then it sends 10 GET requests to /list. The requests are sent one at a time so they don't overlap. Each request is timed with performance.now() from right before the request until the full response is read. The script prints every time and then the average for each endpoint on each VM.
+
+The consistency script is in client/consistency.js. It also runs in Cloud Shell and reads IPs.txt the same way. It runs in a loop 100 times. Each round makes a unique username from a run ID and the loop number. It sends a POST to /register on the us-central1 VM and waits for the reply. Right after that it sends a GET to /list on the europe-west1 VM with no delay. It then checks if the new username is in the list. If it is missing the script adds one to a counter. At the end it prints how many times the user was missing out of 100.
+
+How to run
+cd client
+node latency.js
+node consistency.js

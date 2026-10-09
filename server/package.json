@@ -1,0 +1,8 @@
+{
+  "name": "hw2",
+  "version": "1.0.0",
+  "dependencies": {
+    "@google-cloud/datastore": "^11.2.0",
+    "express": "^4.22.3"
+  }
+}

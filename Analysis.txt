@@ -1,0 +1,27 @@
+Part IV-A: Average latency (10 requests each, run from Google Cloud Shell)
+
+Instance        Endpoint     Avg latency
+us-central1     /register    140.20 ms
+us-central1     /list        44.33 ms
+europe-west1    /register    443.79 ms
+europe-west1    /list        330.41 ms
+
+Raw times (ms):
+us-central1   /register  221.0, 94.1, 482.4, 105.1, 58.5, 38.2, 54.3, 290.1, 22.8, 35.4
+us-central1   /list      49.7, 41.2, 52.2, 62.9, 53.7, 44.1, 34.1, 47.5, 22.9, 35.0
+europe-west1  /register  727.0, 461.1, 439.1, 407.6, 390.4, 448.5, 356.5, 428.8, 346.1, 432.8
+europe-west1  /list      369.1, 449.7, 321.3, 456.7, 338.8, 350.1, 268.0, 241.1, 255.4, 254.0
+
+
+Part IV-B: Eventual consistency test
+
+Wrote with /register on us-central1. Read right away with /list on europe-west1.
+Rounds: 100
+Times the new username was NOT found: 0 / 100
+
+
+Discussion
+
+The main finding is that the europe-west1 VM was much slower than the us-central1 VM. /register went from about 140 ms to 444 ms. /list went from about 44 ms to 330 ms. There are two reasons for this. First, the scripts ran from Cloud Shell, which is in a Google data center in the US. Every request to the europe VM has to cross the Atlantic and come back. Second, the Firestore database is in us-central1. When the europe VM gets a request it has to make another trip back to the US to read or write the data. This means each europe request crosses the ocean about twice. The us-central1 VM is in the same region as the database, so that extra trip is very short. /register was slower than /list on both VMs because a write has to be saved before the server can reply. The us-central1 /register times also jumped around a lot, from 22 ms to 482 ms. The slow ones were likely the first connections warming up or short delays on the database side.
+
+The consistency test found the new username every time. It was missing 0 out of 100 times. This does not show the replication lag the assignment talks about. Firestore in Datastore mode is strongly consistent for reads and queries. Both VMs also use the same single database in us-central1 and not separate copies. The europe VM only sends its /list request after the us-central1 /register has already returned. By then the write is saved, so the read sees it. However, lag would show up in a system where each region has its own copy of the data that updates in the background. In that case a read right after a write in another region could miss the new data for a short time. The extra latency on the europe VM is the cost of always reading up to date data from one central database.
